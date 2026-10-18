@@ -6,6 +6,15 @@ import 'session_storage.dart';
 class PublicacionService {
   final _session = SessionStorage();
 
+  Future<int> _autorId() async {
+    final usuario = await _session.leerUsuario();
+    final id = usuario?['id'];
+    if (id == null) {
+      throw Exception('Sesión no válida, inicia sesión de nuevo');
+    }
+    return (id as num).toInt();
+  }
+
   Future<void> crearEncontrada({
     required String especie,
     required String descripcion,
@@ -14,11 +23,7 @@ class PublicacionService {
     required double longitud,
     required DateTime fecha,
   }) async {
-    final usuario = await _session.leerUsuario();
-    final autorId = usuario?['id'];
-    if (autorId == null) {
-      throw Exception('Sesión no válida, inicia sesión de nuevo');
-    }
+    final autorId = await _autorId();
 
     final response = await http.post(
       Uri.parse('${ApiConfig.baseUrl}/api/publicaciones/encontrada'),
@@ -35,6 +40,51 @@ class PublicacionService {
     );
 
     if (response.statusCode == 201) return;
+    if (response.statusCode == 400) {
+      throw Exception(_detalleValidacion(response));
+    }
+    throw Exception('Error inesperado (${response.statusCode})');
+  }
+
+  Future<List<Map<String, dynamic>>> misPublicaciones() async {
+    final autorId = await _autorId();
+
+    final response = await http.get(
+      Uri.parse('${ApiConfig.baseUrl}/api/publicaciones/mias?autorId=$autorId'),
+      headers: {'Accept': 'application/json'},
+    );
+
+    if (response.statusCode == 200) {
+      final data = jsonDecode(utf8.decode(response.bodyBytes)) as List;
+      return data.cast<Map<String, dynamic>>();
+    }
+    throw Exception(
+        'No se pudieron cargar tus publicaciones (${response.statusCode})');
+  }
+
+  Future<void> eliminar({
+    required int publicacionId,
+    required String motivo,
+  }) async {
+    final autorId = await _autorId();
+
+    final response = await http.post(
+      Uri.parse(
+          '${ApiConfig.baseUrl}/api/publicaciones/$publicacionId/eliminar'),
+      headers: {'Content-Type': 'application/json'},
+      body: utf8.encode(jsonEncode({'motivo': motivo, 'autorId': autorId})),
+    );
+
+    if (response.statusCode == 204) return;
+    if (response.statusCode == 403) {
+      throw Exception('Solo el autor puede eliminar esta publicación');
+    }
+    if (response.statusCode == 404) {
+      throw Exception('La publicación no existe');
+    }
+    if (response.statusCode == 409) {
+      throw Exception('La publicación ya fue eliminada');
+    }
     if (response.statusCode == 400) {
       throw Exception(_detalleValidacion(response));
     }

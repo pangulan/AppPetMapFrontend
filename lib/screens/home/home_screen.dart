@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import '../../services/session_storage.dart';
 import '../auth/login_screen.dart';
 import '../publicaciones/crear_encontrada_screen.dart';
+import '../publicaciones/mis_publicaciones_screen.dart';
 
 class HomeScreen extends StatefulWidget {
   const HomeScreen({super.key});
@@ -50,8 +51,6 @@ class _HomeScreenState extends State<HomeScreen> {
               const SizedBox(height: 8),
               Text('Rol: ${_usuario?['rol'] ?? ''}'),
               const SizedBox(height: 24),
-
-              // 👇 BOTÓN NUEVO
               ElevatedButton(
                 onPressed: () => Navigator.of(context).push(
                   MaterialPageRoute(
@@ -61,7 +60,15 @@ class _HomeScreenState extends State<HomeScreen> {
                 child: const Text('Reportar mascota encontrada'),
               ),
               const SizedBox(height: 12),
-
+              ElevatedButton(
+                onPressed: () => Navigator.of(context).push(
+                  MaterialPageRoute(
+                    builder: (_) => const MisPublicacionesScreen(),
+                  ),
+                ),
+                child: const Text('Mis publicaciones'),
+              ),
+              const SizedBox(height: 12),
               ElevatedButton(
                 onPressed: _cerrarSesion,
                 child: const Text('Cerrar sesión'),
