@@ -44,8 +44,8 @@ class _RegisterScreenState extends State<RegisterScreen> {
       ScaffoldMessenger.of(context).showSnackBar(
         const SnackBar(content: Text('Cuenta creada correctamente')),
       );
-      _formKey.currentState!.reset();
-    } catch (e) {
+        Navigator.of(context).pop();
+       } catch (e) {
       if (!mounted) return;
       ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(content: Text(e.toString().replaceFirst('Exception: ', ''))),
@@ -120,6 +120,11 @@ class _RegisterScreenState extends State<RegisterScreen> {
                         ),
                       )
                     : const Text('Crear cuenta'),
+              ),
+              const SizedBox(height: 12),
+              TextButton(
+                onPressed: () => Navigator.of(context).pop(),
+                child: const Text('¿Ya tienes cuenta? Inicia sesión'),
               ),
             ],
           ),
