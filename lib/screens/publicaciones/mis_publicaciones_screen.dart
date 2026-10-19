@@ -2,6 +2,7 @@ import 'dart:convert';
 import 'package:flutter/material.dart';
 import '../../core/theme/app_colors.dart';
 import '../../services/publicacion_service.dart';
+import 'editar_publicacion_screen.dart';
 
 class MisPublicacionesScreen extends StatefulWidget {
   const MisPublicacionesScreen({super.key});
@@ -43,6 +44,17 @@ class _MisPublicacionesScreenState extends State<MisPublicacionesScreen> {
       if (mounted) setState(() => _cargando = false);
     }
   }
+
+    Future<void> _editar(Map<String, dynamic> pub) async {
+      final cambio = await Navigator.of(context).push<bool>(
+        MaterialPageRoute(
+          builder: (_) => EditarPublicacionScreen(publicacion: pub),
+        ),
+      );
+      if (cambio == true) await _cargar();
+    }
+
+
 
   Future<void> _eliminar(Map<String, dynamic> pub) async {
     final motivo = await showDialog<String>(
@@ -150,11 +162,24 @@ class _MisPublicacionesScreenState extends State<MisPublicacionesScreen> {
                     ),
                   ],
                 ),
-                trailing: IconButton(
-                  icon: const Icon(Icons.delete_outline, color: AppColors.error),
-                  tooltip: 'Eliminar',
-                  onPressed: () => _eliminar(pub),
-                ),
+                              trailing: Row(
+                                mainAxisSize: MainAxisSize.min,
+                                children: [
+                                  if (estado == 'PENDIENTE' || estado == 'APROBADA')
+                                    IconButton(
+                                      icon: const Icon(Icons.edit_outlined,
+                                          color: AppColors.primary),
+                                      tooltip: 'Editar',
+                                      onPressed: () => _editar(pub),
+                                    ),
+                                  IconButton(
+                                    icon: const Icon(Icons.delete_outline,
+                                        color: AppColors.error),
+                                    tooltip: 'Eliminar',
+                                    onPressed: () => _eliminar(pub),
+                                  ),
+                                ],
+                              ),
               ),
             );
           },

@@ -125,6 +125,41 @@ class PublicacionService {
     }
     throw Exception('Error inesperado (${response.statusCode})');
   }
+
+
+    Future<void> editar({
+      required int publicacionId,
+      String? descripcion,
+      String? foto,
+      double? latitud,
+      double? longitud,
+    }) async {
+      final cuerpo = <String, dynamic>{};
+      if (descripcion != null) cuerpo['descripcion'] = descripcion;
+      if (foto != null) cuerpo['foto'] = foto;
+      if (latitud != null) cuerpo['latitud'] = latitud;
+      if (longitud != null) cuerpo['longitud'] = longitud;
+
+      final response = await http.put(
+        Uri.parse('${ApiConfig.baseUrl}/api/publicaciones/$publicacionId'),
+        headers: {'Content-Type': 'application/json'},
+        body: utf8.encode(jsonEncode(cuerpo)),
+      );
+
+      if (response.statusCode == 200) return;
+      if (response.statusCode == 404) {
+        throw Exception('La publicación no existe');
+      }
+      if (response.statusCode == 409) {
+        throw Exception('Esta publicación ya no se puede editar en su estado actual');
+      }
+      if (response.statusCode == 400) {
+        throw Exception(_detalleValidacion(response));
+      }
+      throw Exception('Error inesperado (${response.statusCode})');
+    }
+
+
   String _detalleValidacion(http.Response response) {
     try {
       final data = jsonDecode(utf8.decode(response.bodyBytes));
