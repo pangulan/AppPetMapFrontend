@@ -91,6 +91,40 @@ class PublicacionService {
     throw Exception('Error inesperado (${response.statusCode})');
   }
 
+  Future<void> crearPerdida({
+    required String especie,
+    required String descripcion,
+    String? foto,
+    required double latitud,
+    required double longitud,
+    required DateTime fecha,
+  }) async {
+    final usuario = await _session.leerUsuario();
+    final autorId = usuario?['id'];
+    if (autorId == null) {
+      throw Exception('Sesión no válida, inicia sesión de nuevo');
+    }
+
+    final response = await http.post(
+      Uri.parse('${ApiConfig.baseUrl}/api/publicaciones/perdida'),
+      headers: {'Content-Type': 'application/json'},
+      body: utf8.encode(jsonEncode({
+        'especie': especie,
+        'descripcion': descripcion,
+        'foto': foto,
+        'latitud': latitud,
+        'longitud': longitud,
+        'fecha': fecha.toIso8601String().substring(0, 10),
+        'autorId': autorId,
+      })),
+    );
+
+    if (response.statusCode == 201) return;
+    if (response.statusCode == 400) {
+      throw Exception(_detalleValidacion(response));
+    }
+    throw Exception('Error inesperado (${response.statusCode})');
+  }
   String _detalleValidacion(http.Response response) {
     try {
       final data = jsonDecode(utf8.decode(response.bodyBytes));

@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import '../../services/session_storage.dart';
 import '../auth/login_screen.dart';
 import '../publicaciones/crear_encontrada_screen.dart';
+import '../publicaciones/crear_perdida_screen.dart';
 import '../publicaciones/mis_publicaciones_screen.dart';
 
 class HomeScreen extends StatefulWidget {
@@ -58,6 +59,15 @@ class _HomeScreenState extends State<HomeScreen> {
                   ),
                 ),
                 child: const Text('Reportar mascota encontrada'),
+              ),
+              const SizedBox(height: 12),
+              ElevatedButton(
+                onPressed: () => Navigator.of(context).push(
+                  MaterialPageRoute(
+                    builder: (_) => const CrearPerdidaScreen(),
+                  ),
+                ),
+                child: const Text('Reportar mascota perdida'),
               ),
               const SizedBox(height: 12),
               ElevatedButton(
