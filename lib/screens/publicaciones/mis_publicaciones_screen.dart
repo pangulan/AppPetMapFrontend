@@ -54,6 +54,37 @@ class _MisPublicacionesScreenState extends State<MisPublicacionesScreen> {
       if (cambio == true) await _cargar();
     }
 
+    Future<void> _marcarResuelta(Map<String, dynamic> pub) async {
+      final confirmar = await showDialog<bool>(
+        context: context,
+        builder: (ctx) => AlertDialog(
+          title: const Text('Marcar como resuelta'),
+          content: const Text(
+              '¿Ya encontraste a tu mascota? La publicación quedará como resuelta.'),
+          actions: [
+            TextButton(
+              onPressed: () => Navigator.pop(ctx, false),
+              child: const Text('Cancelar'),
+            ),
+            TextButton(
+              onPressed: () => Navigator.pop(ctx, true),
+              child: const Text('Sí, resuelta'),
+            ),
+          ],
+        ),
+      );
+      if (confirmar != true) return;
+
+      try {
+        await _servicio.marcarResuelta(
+          publicacionId: (pub['id'] as num).toInt(),
+        );
+        _mensaje('Publicación marcada como resuelta');
+        await _cargar();
+      } catch (e) {
+        _mensaje(e.toString().replaceFirst('Exception: ', ''));
+      }
+    }
 
 
   Future<void> _eliminar(Map<String, dynamic> pub) async {
@@ -104,6 +135,8 @@ class _MisPublicacionesScreenState extends State<MisPublicacionesScreen> {
         return Colors.green.shade700;
       case 'RECHAZADA':
         return Colors.red.shade700;
+      case 'RESUELTA':
+        return Colors.blue.shade700;
       default:
         return Colors.grey.shade700;
     }
@@ -162,24 +195,32 @@ class _MisPublicacionesScreenState extends State<MisPublicacionesScreen> {
                     ),
                   ],
                 ),
-                              trailing: Row(
-                                mainAxisSize: MainAxisSize.min,
-                                children: [
-                                  if (estado == 'PENDIENTE' || estado == 'APROBADA')
-                                    IconButton(
-                                      icon: const Icon(Icons.edit_outlined,
-                                          color: AppColors.primary),
-                                      tooltip: 'Editar',
-                                      onPressed: () => _editar(pub),
-                                    ),
-                                  IconButton(
-                                    icon: const Icon(Icons.delete_outline,
-                                        color: AppColors.error),
-                                    tooltip: 'Eliminar',
-                                    onPressed: () => _eliminar(pub),
-                                  ),
-                                ],
-                              ),
+                    trailing: Row(
+                      mainAxisSize: MainAxisSize.min,
+                      children: [
+                        if (pub['tipo'] == 'PERDIDA' &&
+                            (estado == 'PENDIENTE' || estado == 'APROBADA'))
+                          IconButton(
+                            icon: Icon(Icons.check_circle_outline,
+                                color: Colors.green.shade700),
+                            tooltip: 'Marcar como resuelta',
+                            onPressed: () => _marcarResuelta(pub),
+                          ),
+                        if (estado == 'PENDIENTE' || estado == 'APROBADA')
+                          IconButton(
+                            icon: const Icon(Icons.edit_outlined,
+                                color: AppColors.primary),
+                            tooltip: 'Editar',
+                            onPressed: () => _editar(pub),
+                          ),
+                        IconButton(
+                          icon: const Icon(Icons.delete_outline,
+                              color: AppColors.error),
+                          tooltip: 'Eliminar',
+                          onPressed: () => _eliminar(pub),
+                        ),
+                      ],
+                    ),
               ),
             );
           },
