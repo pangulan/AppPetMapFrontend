@@ -159,6 +159,29 @@ class PublicacionService {
       throw Exception('Error inesperado (${response.statusCode})');
     }
 
+     Future<void> marcarResuelta({required int publicacionId}) async {
+       final autorId = await _autorId();
+
+       final response = await http.put(
+         Uri.parse(
+             '${ApiConfig.baseUrl}/api/publicaciones/$publicacionId/resuelta'),
+         headers: {'Content-Type': 'application/json'},
+         body: utf8.encode(jsonEncode({'autorId': autorId})),
+       );
+
+       if (response.statusCode == 200) return;
+       if (response.statusCode == 403) {
+         throw Exception('Solo el autor puede marcar esta publicación como resuelta');
+       }
+       if (response.statusCode == 404) {
+         throw Exception('La publicación no existe');
+       }
+       if (response.statusCode == 409) {
+         throw Exception(
+             'Solo las publicaciones de mascota perdida se pueden marcar como resueltas');
+       }
+       throw Exception('Error inesperado (${response.statusCode})');
+     }
 
   String _detalleValidacion(http.Response response) {
     try {
