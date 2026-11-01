@@ -183,6 +183,52 @@ class PublicacionService {
        throw Exception('Error inesperado (${response.statusCode})');
      }
 
+  Future<List<Map<String, dynamic>>> pendientes() async {
+    final response = await http.get(
+      Uri.parse('${ApiConfig.baseUrl}/api/publicaciones/pendientes'),
+      headers: {'Accept': 'application/json'},
+    );
+    if (response.statusCode == 200) {
+      final data = jsonDecode(utf8.decode(response.bodyBytes)) as List;
+      return data.cast<Map<String, dynamic>>();
+    }
+    throw Exception('No se pudieron cargar las pendientes (${response.statusCode})');
+  }
+
+  Future<void> aprobar({required int publicacionId}) async {
+    final moderadorId = await _autorId();
+    final response = await http.put(
+      Uri.parse('${ApiConfig.baseUrl}/api/publicaciones/$publicacionId/aprobar'),
+      headers: {'Content-Type': 'application/json'},
+      body: utf8.encode(jsonEncode({'moderadorId': moderadorId})),
+    );
+    if (response.statusCode == 200) return;
+    if (response.statusCode == 409) {
+      throw Exception('Solo se pueden moderar publicaciones pendientes');
+    }
+    throw Exception('Error inesperado (${response.statusCode})');
+  }
+
+  Future<void> rechazar({
+    required int publicacionId,
+    required String motivo,
+  }) async {
+    final moderadorId = await _autorId();
+    final response = await http.put(
+      Uri.parse('${ApiConfig.baseUrl}/api/publicaciones/$publicacionId/rechazar'),
+      headers: {'Content-Type': 'application/json'},
+      body: utf8.encode(jsonEncode({'moderadorId': moderadorId, 'motivo': motivo})),
+    );
+    if (response.statusCode == 200) return;
+    if (response.statusCode == 400) {
+      throw Exception('El motivo del rechazo es obligatorio');
+    }
+    if (response.statusCode == 409) {
+      throw Exception('Solo se pueden moderar publicaciones pendientes');
+    }
+    throw Exception('Error inesperado (${response.statusCode})');
+  }
+
   String _detalleValidacion(http.Response response) {
     try {
       final data = jsonDecode(utf8.decode(response.bodyBytes));
