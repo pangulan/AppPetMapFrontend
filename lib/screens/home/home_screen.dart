@@ -4,6 +4,7 @@ import '../auth/login_screen.dart';
 import '../publicaciones/crear_encontrada_screen.dart';
 import '../publicaciones/crear_perdida_screen.dart';
 import '../publicaciones/mis_publicaciones_screen.dart';
+import '../publicaciones/moderacion_screen.dart';
 
 class HomeScreen extends StatefulWidget {
   const HomeScreen({super.key});
@@ -77,6 +78,15 @@ class _HomeScreenState extends State<HomeScreen> {
                   ),
                 ),
                 child: const Text('Mis publicaciones'),
+              ),
+              const SizedBox(height: 12),
+              ElevatedButton(
+                onPressed: () => Navigator.of(context).push(
+                  MaterialPageRoute(
+                    builder: (_) => const ModeracionScreen(),
+                  ),
+                ),
+                child: const Text('Moderar publicaciones'),
               ),
               const SizedBox(height: 12),
               ElevatedButton(
