@@ -2,6 +2,7 @@ import 'dart:convert';
 import 'package:flutter/material.dart';
 import '../../core/theme/app_colors.dart';
 import '../../services/publicacion_service.dart';
+import 'editar_publicacion_screen.dart';
 
 class MisPublicacionesScreen extends StatefulWidget {
   const MisPublicacionesScreen({super.key});
@@ -44,6 +45,47 @@ class _MisPublicacionesScreenState extends State<MisPublicacionesScreen> {
     }
   }
 
+  Future<void> _editar(Map<String, dynamic> pub) async {
+    final cambio = await Navigator.of(context).push<bool>(
+      MaterialPageRoute(
+        builder: (_) => EditarPublicacionScreen(publicacion: pub),
+      ),
+    );
+    if (cambio == true) await _cargar();
+  }
+
+  Future<void> _marcarResuelta(Map<String, dynamic> pub) async {
+    final confirmar = await showDialog<bool>(
+      context: context,
+      builder: (ctx) => AlertDialog(
+        title: const Text('Marcar como resuelta'),
+        content: const Text(
+            '¿Ya encontraste a tu mascota? La publicación quedará como resuelta.'),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(ctx, false),
+            child: const Text('Cancelar'),
+          ),
+          TextButton(
+            onPressed: () => Navigator.pop(ctx, true),
+            child: const Text('Sí, resuelta'),
+          ),
+        ],
+      ),
+    );
+    if (confirmar != true) return;
+
+    try {
+      await _servicio.marcarResuelta(
+        publicacionId: (pub['id'] as num).toInt(),
+      );
+      _mensaje('Publicación marcada como resuelta');
+      await _cargar();
+    } catch (e) {
+      _mensaje(e.toString().replaceFirst('Exception: ', ''));
+    }
+  }
+
   Future<void> _eliminar(Map<String, dynamic> pub) async {
     final motivo = await showDialog<String>(
       context: context,
@@ -63,26 +105,7 @@ class _MisPublicacionesScreenState extends State<MisPublicacionesScreen> {
     }
   }
 
-  Widget _miniatura(String? foto) {
-    const icono = Icon(Icons.pets, size: 40, color: AppColors.primary);
-    if (foto != null && foto.isNotEmpty) {
-      try {
-        return ClipRRect(
-          borderRadius: BorderRadius.circular(8),
-          child: Image.memory(
-            base64Decode(foto),
-            width: 56,
-            height: 56,
-            fit: BoxFit.cover,
-            errorBuilder: (_, __, ___) => icono,
-          ),
-        );
-      } catch (_) {
-        // La foto no es base64 (datos de prueba antiguos).
-      }
-    }
-    return icono;
-  }
+  // ---------- Aspecto ----------
 
   Color _colorEstado(String? estado) {
     switch (estado) {
@@ -92,9 +115,156 @@ class _MisPublicacionesScreenState extends State<MisPublicacionesScreen> {
         return Colors.green.shade700;
       case 'RECHAZADA':
         return Colors.red.shade700;
+      case 'RESUELTA':
+        return Colors.blue.shade700;
       default:
-        return Colors.grey.shade700;
+        return Colors.blueGrey.shade600;
     }
+  }
+
+  String _textoEstado(String? estado) {
+    switch (estado) {
+      case 'PENDIENTE':
+        return 'Pendiente de revisión';
+      case 'APROBADA':
+        return 'Aprobada';
+      case 'RECHAZADA':
+        return 'Rechazada';
+      case 'RESUELTA':
+        return 'Resuelta';
+      case 'CERRADA':
+        return 'Cerrada';
+      default:
+        return estado ?? '';
+    }
+  }
+
+  String _textoTipo(String? tipo) => tipo == 'PERDIDA' ? 'Perdida' : 'Encontrada';
+
+  Color _colorTipo(String? tipo) =>
+      tipo == 'PERDIDA' ? Colors.deepOrange.shade700 : Colors.teal.shade700;
+
+  Widget _chip(String texto, Color color) {
+    return Container(
+      padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
+      decoration: BoxDecoration(
+        color: color.withValues(alpha: 0.12),
+        borderRadius: BorderRadius.circular(999),
+      ),
+      child: Text(
+        texto,
+        style: TextStyle(
+          color: color,
+          fontWeight: FontWeight.bold,
+          fontSize: 12,
+        ),
+      ),
+    );
+  }
+
+  Widget _foto(String? foto) {
+    final placeholder = Container(
+      height: 170,
+      width: double.infinity,
+      color: const Color(0x1AFF7A59),
+      child: const Icon(Icons.pets, size: 56, color: AppColors.primary),
+    );
+    if (foto != null && foto.isNotEmpty) {
+      try {
+        return Image.memory(
+          base64Decode(foto),
+          height: 170,
+          width: double.infinity,
+          fit: BoxFit.cover,
+          errorBuilder: (_, __, ___) => placeholder,
+        );
+      } catch (_) {
+        // La foto no es base64 (datos de prueba antiguos).
+      }
+    }
+    return placeholder;
+  }
+
+  Widget _tarjeta(Map<String, dynamic> pub) {
+    final estado = pub['estado'] as String?;
+    final tipo = pub['tipo'] as String?;
+    final activa = estado == 'PENDIENTE' || estado == 'APROBADA';
+    final puedeResolver = tipo == 'PERDIDA' && activa;
+
+    return Card(
+      clipBehavior: Clip.antiAlias,
+      margin: const EdgeInsets.only(bottom: 16),
+      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          _foto(pub['foto'] as String?),
+          Padding(
+            padding: const EdgeInsets.fromLTRB(16, 12, 16, 0),
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Wrap(
+                  spacing: 8,
+                  runSpacing: 4,
+                  children: [
+                    _chip(_textoTipo(tipo), _colorTipo(tipo)),
+                    _chip(_textoEstado(estado), _colorEstado(estado)),
+                  ],
+                ),
+                const SizedBox(height: 10),
+                Text(
+                  '${pub['especie']}',
+                  style: const TextStyle(
+                    fontSize: 18,
+                    fontWeight: FontWeight.bold,
+                    color: AppColors.textPrimary,
+                  ),
+                ),
+                const SizedBox(height: 4),
+                Text(
+                  '${pub['descripcion']}',
+                  maxLines: 3,
+                  overflow: TextOverflow.ellipsis,
+                  style: const TextStyle(color: AppColors.textSecondary),
+                ),
+              ],
+            ),
+          ),
+          Padding(
+            padding: const EdgeInsets.fromLTRB(8, 4, 8, 8),
+            child: Wrap(
+              alignment: WrapAlignment.end,
+              children: [
+                if (puedeResolver)
+                  TextButton.icon(
+                    onPressed: () => _marcarResuelta(pub),
+                    icon: Icon(Icons.check_circle_outline,
+                        color: Colors.green.shade700),
+                    label: Text('Ya apareció',
+                        style: TextStyle(color: Colors.green.shade700)),
+                  ),
+                if (activa)
+                  TextButton.icon(
+                    onPressed: () => _editar(pub),
+                    icon: const Icon(Icons.edit_outlined,
+                        color: AppColors.primary),
+                    label: const Text('Editar',
+                        style: TextStyle(color: AppColors.primary)),
+                  ),
+                TextButton.icon(
+                  onPressed: () => _eliminar(pub),
+                  icon: const Icon(Icons.delete_outline,
+                      color: AppColors.error),
+                  label: const Text('Eliminar',
+                      style: TextStyle(color: AppColors.error)),
+                ),
+              ],
+            ),
+          ),
+        ],
+      ),
+    );
   }
 
   @override
@@ -117,47 +287,40 @@ class _MisPublicacionesScreenState extends State<MisPublicacionesScreen> {
         ),
       );
     } else if (_items.isEmpty) {
-      cuerpo = const Center(child: Text('Aún no has publicado nada'));
+      cuerpo = const Center(
+        child: Padding(
+          padding: EdgeInsets.all(32),
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              Icon(Icons.inbox_outlined, size: 72, color: AppColors.secondary),
+              SizedBox(height: 16),
+              Text(
+                'Aún no has publicado nada',
+                textAlign: TextAlign.center,
+                style: TextStyle(
+                  fontSize: 18,
+                  fontWeight: FontWeight.bold,
+                  color: AppColors.textPrimary,
+                ),
+              ),
+              SizedBox(height: 8),
+              Text(
+                'Cuando reportes una mascota, la verás aquí con su estado.',
+                textAlign: TextAlign.center,
+                style: TextStyle(color: AppColors.textSecondary),
+              ),
+            ],
+          ),
+        ),
+      );
     } else {
       cuerpo = RefreshIndicator(
         onRefresh: _cargar,
         child: ListView.builder(
           padding: const EdgeInsets.all(16),
           itemCount: _items.length,
-          itemBuilder: (context, i) {
-            final pub = _items[i];
-            final estado = pub['estado'] as String?;
-            return Card(
-              margin: const EdgeInsets.only(bottom: 12),
-              child: ListTile(
-                leading: _miniatura(pub['foto'] as String?),
-                title: Text('${pub['especie']} · ${pub['tipo']}'),
-                subtitle: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    Text(
-                      '${pub['descripcion']}',
-                      maxLines: 2,
-                      overflow: TextOverflow.ellipsis,
-                    ),
-                    const SizedBox(height: 4),
-                    Text(
-                      estado ?? '',
-                      style: TextStyle(
-                        color: _colorEstado(estado),
-                        fontWeight: FontWeight.bold,
-                      ),
-                    ),
-                  ],
-                ),
-                trailing: IconButton(
-                  icon: const Icon(Icons.delete_outline, color: AppColors.error),
-                  tooltip: 'Eliminar',
-                  onPressed: () => _eliminar(pub),
-                ),
-              ),
-            );
-          },
+          itemBuilder: (context, i) => _tarjeta(_items[i]),
         ),
       );
     }

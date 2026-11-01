@@ -1,4 +1,6 @@
 import 'package:flutter/material.dart';
+import '../../core/theme/app_colors.dart';
+import '../../core/widgets/encabezado_marca.dart';
 import '../../services/auth_service.dart';
 import '../home/home_screen.dart';
 import 'register_screen.dart';
@@ -52,61 +54,89 @@ class _LoginScreenState extends State<LoginScreen> {
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      appBar: AppBar(title: const Text('Iniciar sesión')),
       body: SingleChildScrollView(
-        padding: const EdgeInsets.all(24),
-        child: Form(
-          key: _formKey,
-          child: Column(
-            children: [
-              const SizedBox(height: 24),
-              TextFormField(
-                controller: _correoCtrl,
-                keyboardType: TextInputType.emailAddress,
-                decoration: const InputDecoration(labelText: 'Correo electrónico'),
-                validator: (v) =>
-                    (v == null || v.trim().isEmpty) ? 'El correo es obligatorio' : null,
-              ),
-              const SizedBox(height: 16),
-              TextFormField(
-                controller: _contrasenaCtrl,
-                obscureText: _ocultarContrasena,
-                decoration: InputDecoration(
-                  labelText: 'Contraseña',
-                  suffixIcon: IconButton(
-                    icon: Icon(_ocultarContrasena
-                        ? Icons.visibility_off
-                        : Icons.visibility),
-                    onPressed: () =>
-                        setState(() => _ocultarContrasena = !_ocultarContrasena),
-                  ),
-                ),
-                validator: (v) =>
-                    (v == null || v.isEmpty) ? 'La contraseña es obligatoria' : null,
-              ),
-              const SizedBox(height: 24),
-              ElevatedButton(
-                onPressed: _cargando ? null : _iniciarSesion,
-                child: _cargando
-                    ? const SizedBox(
-                        height: 20,
-                        width: 20,
-                        child: CircularProgressIndicator(
-                          strokeWidth: 2,
-                          color: Colors.white,
+        child: Column(
+          children: [
+            const EncabezadoMarca(
+              titulo: 'PetMap',
+              subtitulo: 'Reencuentra a quien más quieres',
+            ),
+            Padding(
+              padding: const EdgeInsets.all(24),
+              child: Form(
+                key: _formKey,
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.stretch,
+                  children: [
+                    const Text(
+                      'Inicia sesión',
+                      style: TextStyle(
+                        fontSize: 22,
+                        fontWeight: FontWeight.bold,
+                        color: AppColors.textPrimary,
+                      ),
+                    ),
+                    const SizedBox(height: 20),
+                    TextFormField(
+                      controller: _correoCtrl,
+                      keyboardType: TextInputType.emailAddress,
+                      textInputAction: TextInputAction.next,
+                      decoration: const InputDecoration(
+                        labelText: 'Correo electrónico',
+                        prefixIcon: Icon(Icons.email_outlined),
+                      ),
+                      validator: (v) => (v == null || v.trim().isEmpty)
+                          ? 'El correo es obligatorio'
+                          : null,
+                    ),
+                    const SizedBox(height: 16),
+                    TextFormField(
+                      controller: _contrasenaCtrl,
+                      obscureText: _ocultarContrasena,
+                      textInputAction: TextInputAction.done,
+                      onFieldSubmitted: (_) => _iniciarSesion(),
+                      decoration: InputDecoration(
+                        labelText: 'Contraseña',
+                        prefixIcon: const Icon(Icons.lock_outline),
+                        suffixIcon: IconButton(
+                          icon: Icon(_ocultarContrasena
+                              ? Icons.visibility_off
+                              : Icons.visibility),
+                          onPressed: () => setState(
+                              () => _ocultarContrasena = !_ocultarContrasena),
                         ),
-                      )
-                    : const Text('Iniciar sesión'),
-              ),
-              const SizedBox(height: 12),
-              TextButton(
-                onPressed: () => Navigator.of(context).push(
-                  MaterialPageRoute(builder: (_) => const RegisterScreen()),
+                      ),
+                      validator: (v) => (v == null || v.isEmpty)
+                          ? 'La contraseña es obligatoria'
+                          : null,
+                    ),
+                    const SizedBox(height: 24),
+                    ElevatedButton(
+                      onPressed: _cargando ? null : _iniciarSesion,
+                      child: _cargando
+                          ? const SizedBox(
+                              height: 20,
+                              width: 20,
+                              child: CircularProgressIndicator(
+                                strokeWidth: 2,
+                                color: Colors.white,
+                              ),
+                            )
+                          : const Text('Iniciar sesión'),
+                    ),
+                    const SizedBox(height: 12),
+                    TextButton(
+                      onPressed: () => Navigator.of(context).push(
+                        MaterialPageRoute(
+                            builder: (_) => const RegisterScreen()),
+                      ),
+                      child: const Text('¿No tienes cuenta? Regístrate'),
+                    ),
+                  ],
                 ),
-                child: const Text('¿No tienes cuenta? Regístrate'),
               ),
-            ],
-          ),
+            ),
+          ],
         ),
       ),
     );
