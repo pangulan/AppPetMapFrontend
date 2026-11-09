@@ -1,4 +1,5 @@
 import 'dart:convert';
+import 'dart:typed_data';
 import 'package:flutter/material.dart';
 import '../../core/theme/app_colors.dart';
 import '../../services/publicacion_service.dart';
@@ -12,6 +13,8 @@ class ModeracionScreen extends StatefulWidget {
 
 class _ModeracionScreenState extends State<ModeracionScreen> {
   final _servicio = PublicacionService();
+  final Set<int> _procesando = {};
+  final Map<int, Uint8List> _fotos = {};
   List<Map<String, dynamic>> _items = [];
   bool _cargando = true;
   String? _error;
@@ -34,6 +37,17 @@ class _ModeracionScreenState extends State<ModeracionScreen> {
     });
     try {
       final items = await _servicio.pendientes();
+      _fotos.clear();
+      for (final p in items) {
+        final foto = p['foto'] as String?;
+        if (foto == null || foto.isEmpty) continue;
+        try {
+          // Se decodifica una sola vez, no en cada redibujado.
+          _fotos[(p['id'] as num).toInt()] = base64Decode(foto);
+        } catch (_) {
+          // La foto no es base64 (datos de prueba antiguos).
+        }
+      }
       if (!mounted) return;
       setState(() => _items = items);
     } catch (e) {
@@ -45,74 +59,167 @@ class _ModeracionScreenState extends State<ModeracionScreen> {
   }
 
   Future<void> _aprobar(Map<String, dynamic> pub) async {
+    final id = (pub['id'] as num).toInt();
+    setState(() => _procesando.add(id));
     try {
-      await _servicio.aprobar(publicacionId: (pub['id'] as num).toInt());
+      await _servicio.aprobar(publicacionId: id);
       _mensaje('Publicación aprobada');
       await _cargar();
     } catch (e) {
       _mensaje(e.toString().replaceFirst('Exception: ', ''));
+    } finally {
+      if (mounted) setState(() => _procesando.remove(id));
     }
   }
 
   Future<void> _rechazar(Map<String, dynamic> pub) async {
-    final ctrl = TextEditingController();
     final motivo = await showDialog<String>(
       context: context,
-      builder: (ctx) => AlertDialog(
-        title: const Text('Rechazar publicación'),
-        content: TextField(
-          controller: ctrl,
-          maxLines: 3,
-          decoration: const InputDecoration(labelText: 'Motivo (obligatorio)'),
-        ),
-        actions: [
-          TextButton(
-            onPressed: () => Navigator.pop(ctx),
-            child: const Text('Cancelar'),
-          ),
-          TextButton(
-            onPressed: () {
-              final texto = ctrl.text.trim();
-              if (texto.isEmpty) return;
-              Navigator.pop(ctx, texto);
-            },
-            child: const Text('Rechazar',
-                style: TextStyle(color: AppColors.error)),
-          ),
-        ],
-      ),
+      builder: (_) => const _MotivoRechazoDialog(),
     );
     if (motivo == null) return;
 
+    final id = (pub['id'] as num).toInt();
+    setState(() => _procesando.add(id));
     try {
-      await _servicio.rechazar(
-        publicacionId: (pub['id'] as num).toInt(),
-        motivo: motivo,
-      );
+      await _servicio.rechazar(publicacionId: id, motivo: motivo);
       _mensaje('Publicación rechazada');
       await _cargar();
     } catch (e) {
       _mensaje(e.toString().replaceFirst('Exception: ', ''));
+    } finally {
+      if (mounted) setState(() => _procesando.remove(id));
     }
   }
 
-  Widget _miniatura(String? foto) {
-    const icono = Icon(Icons.pets, size: 40, color: AppColors.primary);
-    if (foto != null && foto.isNotEmpty) {
-      try {
-        return ClipRRect(
-          borderRadius: BorderRadius.circular(8),
-          child: Image.memory(
-            base64Decode(foto),
-            width: 56,
-            height: 56,
-            fit: BoxFit.cover,
-            errorBuilder: (_, _, _) => icono,
+  // ---------- Aspecto ----------
+
+  Widget _chip(String texto, Color color) {
+    return Container(
+      padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
+      decoration: BoxDecoration(
+        color: color.withValues(alpha: 0.12),
+        borderRadius: BorderRadius.circular(999),
+      ),
+      child: Text(
+        texto,
+        style: TextStyle(
+          color: color,
+          fontWeight: FontWeight.bold,
+          fontSize: 12,
+        ),
+      ),
+    );
+  }
+
+  Widget _foto(int id) {
+    final placeholder = Container(
+      height: 170,
+      width: double.infinity,
+      color: const Color(0x1AFF7A59),
+      child: const Icon(Icons.pets, size: 56, color: AppColors.primary),
+    );
+    final bytes = _fotos[id];
+    if (bytes == null) return placeholder;
+    return Image.memory(
+      bytes,
+      height: 170,
+      width: double.infinity,
+      fit: BoxFit.cover,
+      cacheWidth: 800,
+      gaplessPlayback: true,
+      errorBuilder: (_, __, ___) => placeholder,
+    );
+  }
+
+  Widget _tarjeta(Map<String, dynamic> pub) {
+    final id = (pub['id'] as num).toInt();
+    final tipo = pub['tipo'] as String?;
+    final ocupado = _procesando.contains(id);
+
+    return Card(
+      clipBehavior: Clip.antiAlias,
+      margin: const EdgeInsets.only(bottom: 16),
+      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          _foto(id),
+          Padding(
+            padding: const EdgeInsets.fromLTRB(16, 12, 16, 8),
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Wrap(
+                  spacing: 8,
+                  runSpacing: 4,
+                  children: [
+                    _chip(
+                      tipo == 'PERDIDA' ? 'Perdida' : 'Encontrada',
+                      tipo == 'PERDIDA'
+                          ? Colors.deepOrange.shade700
+                          : Colors.teal.shade700,
+                    ),
+                    _chip('Por revisar', Colors.orange.shade800),
+                  ],
+                ),
+                const SizedBox(height: 10),
+                Text(
+                  '${pub['especie']}',
+                  style: const TextStyle(
+                    fontSize: 18,
+                    fontWeight: FontWeight.bold,
+                    color: AppColors.textPrimary,
+                  ),
+                ),
+                const SizedBox(height: 4),
+                Text(
+                  '${pub['descripcion']}',
+                  style: const TextStyle(color: AppColors.textSecondary),
+                ),
+              ],
+            ),
           ),
-        );
-      } catch (_) {}
-    }
-    return icono;
+          Padding(
+            padding: const EdgeInsets.fromLTRB(16, 0, 16, 16),
+            child: Row(
+              children: [
+                Expanded(
+                  child: OutlinedButton(
+                    onPressed: ocupado ? null : () => _rechazar(pub),
+                    style: OutlinedButton.styleFrom(
+                      foregroundColor: AppColors.error,
+                      side: const BorderSide(color: AppColors.error),
+                    ),
+                    child: const Text('Rechazar'),
+                  ),
+                ),
+                const SizedBox(width: 12),
+                Expanded(
+                  child: ElevatedButton(
+                    onPressed: ocupado ? null : () => _aprobar(pub),
+                    style: ElevatedButton.styleFrom(
+                      backgroundColor: AppColors.secondary,
+                      foregroundColor: Colors.white,
+                    ),
+                    child: ocupado
+                        ? const SizedBox(
+                            height: 18,
+                            width: 18,
+                            child: CircularProgressIndicator(
+                              strokeWidth: 2,
+                              color: Colors.white,
+                            ),
+                          )
+                        : const Text('Aprobar'),
+                  ),
+                ),
+              ],
+            ),
+          ),
+        ],
+      ),
+    );
   }
 
   @override
@@ -135,52 +242,112 @@ class _ModeracionScreenState extends State<ModeracionScreen> {
         ),
       );
     } else if (_items.isEmpty) {
-      cuerpo = const Center(child: Text('No hay publicaciones pendientes'));
+      cuerpo = const Center(
+        child: Padding(
+          padding: EdgeInsets.all(32),
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              Icon(Icons.task_alt, size: 72, color: AppColors.secondary),
+              SizedBox(height: 16),
+              Text(
+                'No hay publicaciones pendientes por revisar',
+                textAlign: TextAlign.center,
+                style: TextStyle(fontSize: 16, color: AppColors.textSecondary),
+              ),
+            ],
+          ),
+        ),
+      );
     } else {
       cuerpo = RefreshIndicator(
         onRefresh: _cargar,
         child: ListView.builder(
           padding: const EdgeInsets.all(16),
-          itemCount: _items.length,
+          itemCount: _items.length + 1,
           itemBuilder: (context, i) {
-            final pub = _items[i];
-            return Card(
-              margin: const EdgeInsets.only(bottom: 12),
-              child: ListTile(
-                leading: _miniatura(pub['foto'] as String?),
-                title: Text('${pub['especie']} · ${pub['tipo']}'),
-                subtitle: Text(
-                  '${pub['descripcion']}',
-                  maxLines: 2,
-                  overflow: TextOverflow.ellipsis,
+            if (i == 0) {
+              return Padding(
+                padding: const EdgeInsets.only(bottom: 12),
+                child: Text(
+                  _items.length == 1
+                      ? '1 publicación por revisar'
+                      : '${_items.length} publicaciones por revisar',
+                  style: const TextStyle(
+                    fontSize: 16,
+                    fontWeight: FontWeight.bold,
+                    color: AppColors.textPrimary,
+                  ),
                 ),
-                trailing: Row(
-                  mainAxisSize: MainAxisSize.min,
-                  children: [
-                    IconButton(
-                      icon: Icon(Icons.check_circle_outline,
-                          color: Colors.green.shade700),
-                      tooltip: 'Aprobar',
-                      onPressed: () => _aprobar(pub),
-                    ),
-                    IconButton(
-                      icon: const Icon(Icons.cancel_outlined,
-                          color: AppColors.error),
-                      tooltip: 'Rechazar',
-                      onPressed: () => _rechazar(pub),
-                    ),
-                  ],
-                ),
-              ),
-            );
+              );
+            }
+            return _tarjeta(_items[i - 1]);
           },
         ),
       );
     }
 
     return Scaffold(
-      appBar: AppBar(title: const Text('Moderar publicaciones')),
+      appBar: AppBar(title: const Text('Moderación')),
       body: cuerpo,
+    );
+  }
+}
+
+class _MotivoRechazoDialog extends StatefulWidget {
+  const _MotivoRechazoDialog();
+
+  @override
+  State<_MotivoRechazoDialog> createState() => _MotivoRechazoDialogState();
+}
+
+class _MotivoRechazoDialogState extends State<_MotivoRechazoDialog> {
+  final _ctrl = TextEditingController();
+  String? _error;
+
+  @override
+  void dispose() {
+    _ctrl.dispose();
+    super.dispose();
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return AlertDialog(
+      title: const Text('Rechazar publicación'),
+      content: Column(
+        mainAxisSize: MainAxisSize.min,
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          const Text('Explica por qué no se aprueba. El motivo queda registrado.'),
+          const SizedBox(height: 12),
+          TextField(
+            controller: _ctrl,
+            maxLines: 3,
+            decoration: InputDecoration(
+              labelText: 'Motivo (obligatorio)',
+              errorText: _error,
+            ),
+          ),
+        ],
+      ),
+      actions: [
+        TextButton(
+          onPressed: () => Navigator.pop(context),
+          child: const Text('Cancelar'),
+        ),
+        TextButton(
+          onPressed: () {
+            final texto = _ctrl.text.trim();
+            if (texto.isEmpty) {
+              setState(() => _error = 'El motivo es obligatorio');
+              return;
+            }
+            Navigator.pop(context, texto);
+          },
+          child: const Text('Rechazar', style: TextStyle(color: AppColors.error)),
+        ),
+      ],
     );
   }
 }
