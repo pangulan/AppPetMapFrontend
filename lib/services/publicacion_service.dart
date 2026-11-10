@@ -266,4 +266,68 @@ class PublicacionService {
     } catch (_) {}
     return 'Revisa los datos ingresados';
   }
+    Future<List<Map<String, dynamic>>> aprobadas() async {
+    final response = await http.get(
+      Uri.parse('${ApiConfig.baseUrl}/api/publicaciones/aprobadas'),
+      headers: {'Accept': 'application/json'},
+    );
+    if (response.statusCode == 200) {
+      final data = jsonDecode(utf8.decode(response.bodyBytes)) as List;
+      return data.cast<Map<String, dynamic>>();
+    }
+    throw Exception(
+        'No se pudieron cargar las publicaciones (${response.statusCode})');
+  }
+
+  Future<String?> fotoDe(int id) async {
+    try {
+      final response = await http.get(
+        Uri.parse('${ApiConfig.baseUrl}/api/publicaciones/$id/foto'),
+      );
+      if (response.statusCode == 200 && response.body.isNotEmpty) {
+        return response.body;
+      }
+    } catch (_) {}
+    return null;
+  }
+    Future<Map<String, int>> resumen() async {
+    final response = await http.get(
+      Uri.parse('${ApiConfig.baseUrl}/api/publicaciones/resumen'),
+      headers: await _cabecerasConToken(),
+    );
+    final errorAcceso = _errorDeAcceso(response);
+    if (errorAcceso != null) throw errorAcceso;
+    if (response.statusCode == 200) {
+      final data =
+          jsonDecode(utf8.decode(response.bodyBytes)) as Map<String, dynamic>;
+      return data.map((k, v) => MapEntry(k, (v as num).toInt()));
+    }
+    throw Exception('No se pudo cargar el resumen (${response.statusCode})');
+  }
+
+  Future<void> retirar({
+    required int publicacionId,
+    required String motivo,
+  }) async {
+    final moderadorId = await _autorId();
+    final response = await http.put(
+      Uri.parse('${ApiConfig.baseUrl}/api/publicaciones/$publicacionId/retirar'),
+      headers: await _cabecerasConToken(json: true),
+      body: utf8.encode(
+          jsonEncode({'moderadorId': moderadorId, 'motivo': motivo})),
+    );
+    final errorAcceso = _errorDeAcceso(response);
+    if (errorAcceso != null) throw errorAcceso;
+    if (response.statusCode == 204) return;
+    if (response.statusCode == 400) {
+      throw Exception('El motivo del retiro es obligatorio');
+    }
+    if (response.statusCode == 404) {
+      throw Exception('La publicación ya no existe');
+    }
+    if (response.statusCode == 409) {
+      throw Exception('Solo se pueden retirar publicaciones aprobadas');
+    }
+    throw Exception('Error inesperado (${response.statusCode})');
+  }
 }
