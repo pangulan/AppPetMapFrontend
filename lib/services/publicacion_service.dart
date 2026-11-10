@@ -15,6 +15,27 @@ class PublicacionService {
     return (id as num).toInt();
   }
 
+  // Cabeceras con el token JWT del usuario que inició sesión.
+  Future<Map<String, String>> _cabecerasConToken({bool json = false}) async {
+    final token = await _session.leerToken();
+    return {
+      if (json) 'Content-Type': 'application/json',
+      'Accept': 'application/json',
+      if (token != null) 'Authorization': 'Bearer $token',
+    };
+  }
+
+  // Traduce los errores de acceso del backend a mensajes claros.
+  Exception? _errorDeAcceso(http.Response response) {
+    if (response.statusCode == 401) {
+      return Exception('Tu sesión venció. Cierra sesión y vuelve a entrar.');
+    }
+    if (response.statusCode == 403) {
+      return Exception('Solo un administrador puede moderar publicaciones.');
+    }
+    return null;
+  }
+
   Future<void> crearEncontrada({
     required String especie,
     required String descripcion,
@@ -186,8 +207,10 @@ class PublicacionService {
   Future<List<Map<String, dynamic>>> pendientes() async {
     final response = await http.get(
       Uri.parse('${ApiConfig.baseUrl}/api/publicaciones/pendientes'),
-      headers: {'Accept': 'application/json'},
+      headers: await _cabecerasConToken(),
     );
+    final errorAcceso = _errorDeAcceso(response);
+    if (errorAcceso != null) throw errorAcceso;
     if (response.statusCode == 200) {
       final data = jsonDecode(utf8.decode(response.bodyBytes)) as List;
       return data.cast<Map<String, dynamic>>();
@@ -199,9 +222,11 @@ class PublicacionService {
     final moderadorId = await _autorId();
     final response = await http.put(
       Uri.parse('${ApiConfig.baseUrl}/api/publicaciones/$publicacionId/aprobar'),
-      headers: {'Content-Type': 'application/json'},
+      headers: await _cabecerasConToken(json: true),
       body: utf8.encode(jsonEncode({'moderadorId': moderadorId})),
     );
+    final errorAcceso = _errorDeAcceso(response);
+    if (errorAcceso != null) throw errorAcceso;
     if (response.statusCode == 200) return;
     if (response.statusCode == 409) {
       throw Exception('Solo se pueden moderar publicaciones pendientes');
@@ -216,9 +241,11 @@ class PublicacionService {
     final moderadorId = await _autorId();
     final response = await http.put(
       Uri.parse('${ApiConfig.baseUrl}/api/publicaciones/$publicacionId/rechazar'),
-      headers: {'Content-Type': 'application/json'},
+      headers: await _cabecerasConToken(json: true),
       body: utf8.encode(jsonEncode({'moderadorId': moderadorId, 'motivo': motivo})),
     );
+    final errorAcceso = _errorDeAcceso(response);
+    if (errorAcceso != null) throw errorAcceso;
     if (response.statusCode == 200) return;
     if (response.statusCode == 400) {
       throw Exception('El motivo del rechazo es obligatorio');
