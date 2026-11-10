@@ -354,9 +354,9 @@ class _InicioTab extends StatelessWidget {
                       ),
                     ),
                     const SizedBox(height: 4),
-                    const Text(
-                      '¿A quién ayudamos hoy?',
-                      style: TextStyle(color: Colors.white70),
+                      Text(
+                      esAdmin ? 'Modo administrador' : '¿A quién ayudamos hoy?',
+                      style: const TextStyle(color: Colors.white70),
                     ),
                   ],
                 ),
