@@ -4,6 +4,7 @@ import 'package:flutter/material.dart';
 import 'package:geolocator/geolocator.dart';
 import 'package:image_picker/image_picker.dart';
 import '../../core/theme/app_colors.dart';
+import '../../core/widgets/selector_especie.dart';
 import '../../services/publicacion_service.dart';
 
 class CrearPerdidaScreen extends StatefulWidget {
@@ -64,7 +65,7 @@ class _CrearPerdidaScreenState extends State<CrearPerdidaScreen> {
             ),
             if (_fotoBytes != null)
               ListTile(
-                leading: const Icon(Icons.delete_outline),
+                leading: const Icon(Icons.delete_outline, color: AppColors.error),
                 title: const Text('Quitar foto'),
                 onTap: () {
                   Navigator.pop(ctx);
@@ -79,6 +80,7 @@ class _CrearPerdidaScreenState extends State<CrearPerdidaScreen> {
 
   Future<void> _elegirFoto(ImageSource origen) async {
     try {
+      // Se reduce el tamaño para que el base64 sea liviano.
       final imagen = await _picker.pickImage(
         source: origen,
         maxWidth: 800,
@@ -223,19 +225,14 @@ class _CrearPerdidaScreenState extends State<CrearPerdidaScreen> {
                 ),
               ),
               const SizedBox(height: 16),
-              TextFormField(
-                controller: _especieCtrl,
-                decoration:
-                    const InputDecoration(labelText: 'Especie (perro, gato...)'),
-                validator: (v) => (v == null || v.trim().isEmpty)
-                    ? 'La especie es obligatoria'
-                    : null,
-              ),
+              SelectorEspecie(controller: _especieCtrl),
               const SizedBox(height: 16),
               TextFormField(
                 controller: _descripcionCtrl,
                 maxLines: 3,
-                decoration: const InputDecoration(labelText: 'Descripción'),
+                decoration: const InputDecoration(
+                  labelText: 'Descripción (color, tamaño, señas...)',
+                ),
                 validator: (v) => (v == null || v.trim().isEmpty)
                     ? 'La descripción es obligatoria'
                     : null,
