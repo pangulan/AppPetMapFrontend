@@ -57,7 +57,8 @@ class _ResumenAdminState extends State<ResumenAdmin> {
     }
 
     final d = _datos!;
-    return GridView.count(
+      return GridView.count(
+      padding: EdgeInsets.zero,
       crossAxisCount: 2,
       shrinkWrap: true,
       physics: const NeverScrollableScrollPhysics(),
