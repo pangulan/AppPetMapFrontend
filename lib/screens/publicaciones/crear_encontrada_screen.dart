@@ -4,8 +4,8 @@ import 'package:flutter/material.dart';
 import 'package:geolocator/geolocator.dart';
 import 'package:image_picker/image_picker.dart';
 import '../../core/theme/app_colors.dart';
+import '../../core/widgets/selector_especie.dart';
 import '../../services/publicacion_service.dart';
-import 'package:flutter/foundation.dart';
 
 class CrearEncontradaScreen extends StatefulWidget {
   const CrearEncontradaScreen({super.key});
@@ -29,14 +29,7 @@ class _CrearEncontradaScreenState extends State<CrearEncontradaScreen> {
   bool _cargando = false;
 
   @override
-  void initState() {
-    super.initState();
-    debugPrint('>>> pantalla encontrada: initState');
-  }
-
-  @override
   void dispose() {
-    debugPrint('>>> pantalla encontrada: dispose');
     _especieCtrl.dispose();
     _descripcionCtrl.dispose();
     super.dispose();
@@ -134,7 +127,6 @@ class _CrearEncontradaScreenState extends State<CrearEncontradaScreen> {
 
   // ---------- Fecha ----------
   Future<void> _elegirFecha() async {
-    debugPrint('>>> abriendo calendario');
     final hoy = DateTime.now();
     final elegida = await showDatePicker(
       context: context,
@@ -142,7 +134,6 @@ class _CrearEncontradaScreenState extends State<CrearEncontradaScreen> {
       firstDate: DateTime(hoy.year - 1),
       lastDate: hoy,
     );
-    debugPrint('>>> fecha elegida: $elegida');
     if (elegida != null) setState(() => _fecha = elegida);
   }
 
@@ -229,14 +220,7 @@ class _CrearEncontradaScreenState extends State<CrearEncontradaScreen> {
                 ),
               ),
               const SizedBox(height: 16),
-              TextFormField(
-                controller: _especieCtrl,
-                decoration:
-                    const InputDecoration(labelText: 'Especie (perro, gato...)'),
-                validator: (v) => (v == null || v.trim().isEmpty)
-                    ? 'La especie es obligatoria'
-                    : null,
-              ),
+              SelectorEspecie(controller: _especieCtrl),
               const SizedBox(height: 16),
               TextFormField(
                 controller: _descripcionCtrl,

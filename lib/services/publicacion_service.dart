@@ -330,4 +330,19 @@ class PublicacionService {
     }
     throw Exception('Error inesperado (${response.statusCode})');
   }
+
+    Future<Map<String, dynamic>> contactoDe(int id) async {
+    final response = await http.get(
+      Uri.parse('${ApiConfig.baseUrl}/api/publicaciones/$id/contacto'),
+      headers: await _cabecerasConToken(),
+    );
+    if (response.statusCode == 401 || response.statusCode == 403) {
+      throw Exception('Inicia sesión de nuevo para ver el contacto.');
+    }
+    if (response.statusCode == 200) {
+      return jsonDecode(utf8.decode(response.bodyBytes))
+          as Map<String, dynamic>;
+    }
+    throw Exception('No se pudo cargar el contacto (${response.statusCode})');
+  }
 }
