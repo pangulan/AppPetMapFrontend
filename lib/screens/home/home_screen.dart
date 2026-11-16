@@ -2,10 +2,13 @@ import 'package:flutter/material.dart';
 import '../../core/theme/app_colors.dart';
 import '../../services/session_storage.dart';
 import '../auth/login_screen.dart';
+import '../admin/activas_screen.dart';
+import '../admin/resumen_admin.dart';
 import '../publicaciones/crear_encontrada_screen.dart';
 import '../publicaciones/crear_perdida_screen.dart';
 import '../publicaciones/mis_publicaciones_screen.dart';
 import '../publicaciones/moderacion_screen.dart';
+import '../mapa/mapa_screen.dart';
 
 String _iniciales(String? nombre) {
   final partes = (nombre ?? '')
@@ -35,6 +38,7 @@ class _HomeScreenState extends State<HomeScreen> {
   final _session = SessionStorage();
   Map<String, dynamic>? _usuario;
   int _tab = 0;
+  int _refrescoResumen = 0;
 
   bool get _esAdmin => _usuario?['rol'] == 'ADMINISTRADOR';
 
@@ -79,6 +83,13 @@ class _HomeScreenState extends State<HomeScreen> {
     Navigator.of(context).push(MaterialPageRoute(builder: (_) => pantalla));
   }
 
+  // Abre una pantalla del administrador y, al volver, actualiza los contadores.
+  Future<void> _abrirYRefrescar(Widget pantalla) async {
+    await Navigator.of(context)
+        .push(MaterialPageRoute(builder: (_) => pantalla));
+    if (mounted) setState(() => _refrescoResumen++);
+  }
+
   void _elegirTipoReporte() {
     showModalBottomSheet(
       context: context,
@@ -99,7 +110,8 @@ class _HomeScreenState extends State<HomeScreen> {
             ListTile(
               leading: const Icon(Icons.search, color: AppColors.primary),
               title: const Text('La perdí'),
-              subtitle: const Text('Publica sus datos para que te ayuden a encontrarla'),
+              subtitle: const Text(
+                  'Publica sus datos para que te ayuden a encontrarla'),
               onTap: () {
                 Navigator.pop(ctx);
                 _abrir(const CrearPerdidaScreen());
@@ -131,11 +143,13 @@ class _HomeScreenState extends State<HomeScreen> {
           _InicioTab(
             nombre: nombre,
             esAdmin: _esAdmin,
+            refrescoResumen: _refrescoResumen,
             onReportar: _elegirTipoReporte,
             onMisPublicaciones: () => _abrir(const MisPublicacionesScreen()),
-            onModerar: () => _abrir(const ModeracionScreen()),
+            onModerar: () => _abrirYRefrescar(const ModeracionScreen()),
+            onActivas: () => _abrirYRefrescar(const ActivasScreen()),
           ),
-          const _MapaTab(),
+          _tab == 1 ? const MapaScreen() : const SizedBox.shrink(),
           _PerfilTab(usuario: _usuario, onCerrarSesion: _confirmarCierre),
         ],
       ),
@@ -320,16 +334,20 @@ class _InicioTab extends StatelessWidget {
   const _InicioTab({
     required this.nombre,
     required this.esAdmin,
+    required this.refrescoResumen,
     required this.onReportar,
     required this.onMisPublicaciones,
     required this.onModerar,
+    required this.onActivas,
   });
 
   final String? nombre;
   final bool esAdmin;
+  final int refrescoResumen;
   final VoidCallback onReportar;
   final VoidCallback onMisPublicaciones;
   final VoidCallback onModerar;
+  final VoidCallback onActivas;
 
   @override
   Widget build(BuildContext context) {
@@ -354,7 +372,7 @@ class _InicioTab extends StatelessWidget {
                       ),
                     ),
                     const SizedBox(height: 4),
-                      Text(
+                    Text(
                       esAdmin ? 'Modo administrador' : '¿A quién ayudamos hoy?',
                       style: const TextStyle(color: Colors.white70),
                     ),
@@ -368,32 +386,18 @@ class _InicioTab extends StatelessWidget {
           child: ListView(
             padding: const EdgeInsets.all(24),
             children: [
-              const Text(
-                '¿Qué quieres hacer?',
-                style: TextStyle(
+              Text(
+                esAdmin ? 'Panel de administración' : '¿Qué quieres hacer?',
+                style: const TextStyle(
                   fontSize: 18,
                   fontWeight: FontWeight.bold,
                   color: AppColors.textPrimary,
                 ),
               ),
               const SizedBox(height: 16),
-              _AccionCard(
-                icono: Icons.pets,
-                color: AppColors.primary,
-                titulo: 'Reportar mascota',
-                descripcion: 'Cuéntanos si perdiste o encontraste una mascota.',
-                onTap: onReportar,
-              ),
-              const SizedBox(height: 12),
-              _AccionCard(
-                icono: Icons.list_alt,
-                color: AppColors.secondary,
-                titulo: 'Mis publicaciones',
-                descripcion: 'Revisa su estado, edítalas o elimínalas.',
-                onTap: onMisPublicaciones,
-              ),
               if (esAdmin) ...[
-                const SizedBox(height: 12),
+                ResumenAdmin(key: ValueKey(refrescoResumen)),
+                const SizedBox(height: 20),
                 _AccionCard(
                   icono: Icons.admin_panel_settings,
                   color: Colors.orange.shade800,
@@ -401,60 +405,32 @@ class _InicioTab extends StatelessWidget {
                   descripcion: 'Aprueba o rechaza lo que reporta la comunidad.',
                   onTap: onModerar,
                 ),
+                const SizedBox(height: 12),
+                _AccionCard(
+                  icono: Icons.inventory_2_outlined,
+                  color: AppColors.secondary,
+                  titulo: 'Publicaciones activas',
+                  descripcion: 'Revisa lo publicado y retira lo que no corresponda.',
+                  onTap: onActivas,
+                ),
+              ] else ...[
+                _AccionCard(
+                  icono: Icons.pets,
+                  color: AppColors.primary,
+                  titulo: 'Reportar mascota',
+                  descripcion: 'Cuéntanos si perdiste o encontraste una mascota.',
+                  onTap: onReportar,
+                ),
+                const SizedBox(height: 12),
+                _AccionCard(
+                  icono: Icons.list_alt,
+                  color: AppColors.secondary,
+                  titulo: 'Mis publicaciones',
+                  descripcion: 'Revisa su estado, edítalas o elimínalas.',
+                  onTap: onMisPublicaciones,
+                ),
               ],
             ],
-          ),
-        ),
-      ],
-    );
-  }
-}
-
-class _MapaTab extends StatelessWidget {
-  const _MapaTab();
-
-  @override
-  Widget build(BuildContext context) {
-    return Column(
-      children: [
-        _Encabezado(
-          hijo: Column(
-            mainAxisSize: MainAxisSize.min,
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: const [
-              Text(
-                'Mapa',
-                style: TextStyle(
-                  color: Colors.white,
-                  fontSize: 22,
-                  fontWeight: FontWeight.bold,
-                ),
-              ),
-              SizedBox(height: 4),
-              Text('Mascotas cerca de ti', style: TextStyle(color: Colors.white70)),
-            ],
-          ),
-        ),
-        const Expanded(
-          child: Center(
-            child: Padding(
-              padding: EdgeInsets.all(32),
-              child: Column(
-                mainAxisSize: MainAxisSize.min,
-                children: [
-                  Icon(Icons.map_outlined, size: 72, color: AppColors.secondary),
-                  SizedBox(height: 16),
-                  Text(
-                    'Pronto verás aquí las mascotas reportadas cerca de ti',
-                    textAlign: TextAlign.center,
-                    style: TextStyle(
-                      fontSize: 16,
-                      color: AppColors.textSecondary,
-                    ),
-                  ),
-                ],
-              ),
-            ),
           ),
         ),
       ],
