@@ -4,6 +4,7 @@ import 'package:flutter_map/flutter_map.dart';
 import 'package:latlong2/latlong.dart';
 import '../../core/theme/app_colors.dart';
 import '../../services/publicacion_service.dart';
+import 'comentarios_seccion.dart';
 
 class MapaScreen extends StatefulWidget {
   const MapaScreen({super.key});
@@ -346,8 +347,12 @@ class _DetalleSheetState extends State<_DetalleSheet> {
     final pub = widget.pub;
     return SafeArea(
       child: SingleChildScrollView(
-        padding: const EdgeInsets.fromLTRB(20, 0, 20, 24),
-        child: Column(
+        padding: EdgeInsets.fromLTRB(
+          20,
+          0,
+          20,
+          24 + MediaQuery.of(context).viewInsets.bottom,
+        ),        child: Column(
           mainAxisSize: MainAxisSize.min,
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
@@ -446,6 +451,10 @@ class _DetalleSheetState extends State<_DetalleSheet> {
                   return _tarjetaContacto(snap.data!);
                 },
               ),
+                          const SizedBox(height: 20),
+            const Divider(),
+            const SizedBox(height: 8),
+            ComentariosSeccion(publicacionId: (pub['id'] as num).toInt()),
           ],
         ),
       ),
