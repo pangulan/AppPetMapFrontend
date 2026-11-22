@@ -1,11 +1,17 @@
 import 'package:flutter/material.dart';
 import '../../core/theme/app_colors.dart';
+import '../../services/notificaciones_service.dart';
 import '../../services/session_storage.dart';
 import '../auth/login_screen.dart';
+import '../admin/activas_screen.dart';
+import '../admin/resumen_admin.dart';
+import '../avisos/avisos_screen.dart';
+import '../perfil/editar_perfil_screen.dart';
 import '../publicaciones/crear_encontrada_screen.dart';
 import '../publicaciones/crear_perdida_screen.dart';
 import '../publicaciones/mis_publicaciones_screen.dart';
 import '../publicaciones/moderacion_screen.dart';
+import '../mapa/mapa_screen.dart';
 
 String _iniciales(String? nombre) {
   final partes = (nombre ?? '')
@@ -33,8 +39,11 @@ class HomeScreen extends StatefulWidget {
 
 class _HomeScreenState extends State<HomeScreen> {
   final _session = SessionStorage();
+  final _avisosServicio = NotificacionesService();
   Map<String, dynamic>? _usuario;
   int _tab = 0;
+  int _refrescoResumen = 0;
+  int _avisos = 0;
 
   bool get _esAdmin => _usuario?['rol'] == 'ADMINISTRADOR';
 
@@ -47,6 +56,20 @@ class _HomeScreenState extends State<HomeScreen> {
   Future<void> _cargarUsuario() async {
     final usuario = await _session.leerUsuario();
     if (mounted) setState(() => _usuario = usuario);
+    _revisarAvisos();
+  }
+
+  Future<void> _revisarAvisos() async {
+    if (_esAdmin) {
+      if (_avisos != 0 && mounted) setState(() => _avisos = 0);
+      return;
+    }
+    try {
+      final r = await _avisosServicio.calcular();
+      if (mounted) setState(() => _avisos = r.pendientes);
+    } catch (_) {
+      // Sin conexión o sesión vencida: simplemente no se muestran avisos.
+    }
   }
 
   Future<void> _confirmarCierre() async {
@@ -75,8 +98,26 @@ class _HomeScreenState extends State<HomeScreen> {
     );
   }
 
-  void _abrir(Widget pantalla) {
-    Navigator.of(context).push(MaterialPageRoute(builder: (_) => pantalla));
+  Future<void> _editarPerfil() async {
+    final cambio = await Navigator.of(context).push<bool>(
+      MaterialPageRoute(
+        builder: (_) => EditarPerfilScreen(usuario: _usuario ?? {}),
+      ),
+    );
+    if (cambio == true) await _cargarUsuario();
+  }
+
+  Future<void> _abrir(Widget pantalla) async {
+    await Navigator.of(context)
+        .push(MaterialPageRoute(builder: (_) => pantalla));
+    _revisarAvisos();
+  }
+
+  // Abre una pantalla del administrador y, al volver, actualiza los contadores.
+  Future<void> _abrirYRefrescar(Widget pantalla) async {
+    await Navigator.of(context)
+        .push(MaterialPageRoute(builder: (_) => pantalla));
+    if (mounted) setState(() => _refrescoResumen++);
   }
 
   void _elegirTipoReporte() {
@@ -99,7 +140,8 @@ class _HomeScreenState extends State<HomeScreen> {
             ListTile(
               leading: const Icon(Icons.search, color: AppColors.primary),
               title: const Text('La perdí'),
-              subtitle: const Text('Publica sus datos para que te ayuden a encontrarla'),
+              subtitle: const Text(
+                  'Publica sus datos para que te ayuden a encontrarla'),
               onTap: () {
                 Navigator.pop(ctx);
                 _abrir(const CrearPerdidaScreen());
@@ -131,12 +173,20 @@ class _HomeScreenState extends State<HomeScreen> {
           _InicioTab(
             nombre: nombre,
             esAdmin: _esAdmin,
+            refrescoResumen: _refrescoResumen,
+            avisos: _avisos,
+            onAvisos: () => _abrir(const AvisosScreen()),
             onReportar: _elegirTipoReporte,
             onMisPublicaciones: () => _abrir(const MisPublicacionesScreen()),
-            onModerar: () => _abrir(const ModeracionScreen()),
+            onModerar: () => _abrirYRefrescar(const ModeracionScreen()),
+            onActivas: () => _abrirYRefrescar(const ActivasScreen()),
           ),
-          const _MapaTab(),
-          _PerfilTab(usuario: _usuario, onCerrarSesion: _confirmarCierre),
+          _tab == 1 ? const MapaScreen() : const SizedBox.shrink(),
+          _PerfilTab(
+            usuario: _usuario,
+            onCerrarSesion: _confirmarCierre,
+            onEditar: _editarPerfil,
+          ),
         ],
       ),
       bottomNavigationBar: NavigationBar(
@@ -320,16 +370,24 @@ class _InicioTab extends StatelessWidget {
   const _InicioTab({
     required this.nombre,
     required this.esAdmin,
+    required this.refrescoResumen,
+    required this.avisos,
+    required this.onAvisos,
     required this.onReportar,
     required this.onMisPublicaciones,
     required this.onModerar,
+    required this.onActivas,
   });
 
   final String? nombre;
   final bool esAdmin;
+  final int refrescoResumen;
+  final int avisos;
+  final VoidCallback onAvisos;
   final VoidCallback onReportar;
   final VoidCallback onMisPublicaciones;
   final VoidCallback onModerar;
+  final VoidCallback onActivas;
 
   @override
   Widget build(BuildContext context) {
@@ -354,13 +412,27 @@ class _InicioTab extends StatelessWidget {
                       ),
                     ),
                     const SizedBox(height: 4),
-                    const Text(
-                      '¿A quién ayudamos hoy?',
-                      style: TextStyle(color: Colors.white70),
+                    Text(
+                      esAdmin ? 'Modo administrador' : '¿A quién ayudamos hoy?',
+                      style: const TextStyle(color: Colors.white70),
                     ),
                   ],
                 ),
               ),
+              if (!esAdmin)
+                IconButton(
+                  tooltip: 'Avisos',
+                  onPressed: onAvisos,
+                  icon: Badge(
+                    isLabelVisible: avisos > 0,
+                    label: Text('$avisos'),
+                    child: const Icon(
+                      Icons.notifications_outlined,
+                      color: Colors.white,
+                      size: 28,
+                    ),
+                  ),
+                ),
             ],
           ),
         ),
@@ -368,38 +440,48 @@ class _InicioTab extends StatelessWidget {
           child: ListView(
             padding: const EdgeInsets.all(24),
             children: [
-              const Text(
-                '¿Qué quieres hacer?',
-                style: TextStyle(
+              Text(
+                esAdmin ? 'Panel de administración' : '¿Qué quieres hacer?',
+                style: const TextStyle(
                   fontSize: 18,
                   fontWeight: FontWeight.bold,
                   color: AppColors.textPrimary,
                 ),
               ),
               const SizedBox(height: 16),
-              _AccionCard(
-                icono: Icons.pets,
-                color: AppColors.primary,
-                titulo: 'Reportar mascota',
-                descripcion: 'Cuéntanos si perdiste o encontraste una mascota.',
-                onTap: onReportar,
-              ),
-              const SizedBox(height: 12),
-              _AccionCard(
-                icono: Icons.list_alt,
-                color: AppColors.secondary,
-                titulo: 'Mis publicaciones',
-                descripcion: 'Revisa su estado, edítalas o elimínalas.',
-                onTap: onMisPublicaciones,
-              ),
               if (esAdmin) ...[
-                const SizedBox(height: 12),
+                ResumenAdmin(key: ValueKey(refrescoResumen)),
+                const SizedBox(height: 20),
                 _AccionCard(
                   icono: Icons.admin_panel_settings,
                   color: Colors.orange.shade800,
                   titulo: 'Moderar publicaciones',
                   descripcion: 'Aprueba o rechaza lo que reporta la comunidad.',
                   onTap: onModerar,
+                ),
+                const SizedBox(height: 12),
+                _AccionCard(
+                  icono: Icons.inventory_2_outlined,
+                  color: AppColors.secondary,
+                  titulo: 'Publicaciones activas',
+                  descripcion: 'Revisa lo publicado y retira lo que no corresponda.',
+                  onTap: onActivas,
+                ),
+              ] else ...[
+                _AccionCard(
+                  icono: Icons.pets,
+                  color: AppColors.primary,
+                  titulo: 'Reportar mascota',
+                  descripcion: 'Cuéntanos si perdiste o encontraste una mascota.',
+                  onTap: onReportar,
+                ),
+                const SizedBox(height: 12),
+                _AccionCard(
+                  icono: Icons.list_alt,
+                  color: AppColors.secondary,
+                  titulo: 'Mis publicaciones',
+                  descripcion: 'Revisa su estado, edítalas o elimínalas.',
+                  onTap: onMisPublicaciones,
                 ),
               ],
             ],
@@ -410,63 +492,16 @@ class _InicioTab extends StatelessWidget {
   }
 }
 
-class _MapaTab extends StatelessWidget {
-  const _MapaTab();
-
-  @override
-  Widget build(BuildContext context) {
-    return Column(
-      children: [
-        _Encabezado(
-          hijo: Column(
-            mainAxisSize: MainAxisSize.min,
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: const [
-              Text(
-                'Mapa',
-                style: TextStyle(
-                  color: Colors.white,
-                  fontSize: 22,
-                  fontWeight: FontWeight.bold,
-                ),
-              ),
-              SizedBox(height: 4),
-              Text('Mascotas cerca de ti', style: TextStyle(color: Colors.white70)),
-            ],
-          ),
-        ),
-        const Expanded(
-          child: Center(
-            child: Padding(
-              padding: EdgeInsets.all(32),
-              child: Column(
-                mainAxisSize: MainAxisSize.min,
-                children: [
-                  Icon(Icons.map_outlined, size: 72, color: AppColors.secondary),
-                  SizedBox(height: 16),
-                  Text(
-                    'Pronto verás aquí las mascotas reportadas cerca de ti',
-                    textAlign: TextAlign.center,
-                    style: TextStyle(
-                      fontSize: 16,
-                      color: AppColors.textSecondary,
-                    ),
-                  ),
-                ],
-              ),
-            ),
-          ),
-        ),
-      ],
-    );
-  }
-}
-
 class _PerfilTab extends StatelessWidget {
-  const _PerfilTab({required this.usuario, required this.onCerrarSesion});
+  const _PerfilTab({
+    required this.usuario,
+    required this.onCerrarSesion,
+    required this.onEditar,
+  });
 
   final Map<String, dynamic>? usuario;
   final VoidCallback onCerrarSesion;
+  final VoidCallback onEditar;
 
   @override
   Widget build(BuildContext context) {
@@ -509,6 +544,12 @@ class _PerfilTab extends StatelessWidget {
                   valor: telefono,
                 ),
               const SizedBox(height: 24),
+              ElevatedButton.icon(
+                onPressed: onEditar,
+                icon: const Icon(Icons.edit_outlined),
+                label: const Text('Editar perfil'),
+              ),
+              const SizedBox(height: 12),
               OutlinedButton.icon(
                 onPressed: onCerrarSesion,
                 icon: const Icon(Icons.logout, color: AppColors.error),

@@ -222,12 +222,31 @@ class _MisPublicacionesScreenState extends State<MisPublicacionesScreen> {
                   ),
                 ),
                 const SizedBox(height: 4),
-                Text(
+                     Text(
                   '${pub['descripcion']}',
                   maxLines: 3,
                   overflow: TextOverflow.ellipsis,
                   style: const TextStyle(color: AppColors.textSecondary),
                 ),
+                if (estado == 'RECHAZADA' &&
+                    ((pub['motivoRechazo'] as String?) ?? '').isNotEmpty) ...[
+                  const SizedBox(height: 10),
+                  Container(
+                    width: double.infinity,
+                    padding: const EdgeInsets.all(10),
+                    decoration: BoxDecoration(
+                      color: Colors.red.withValues(alpha: 0.08),
+                      borderRadius: BorderRadius.circular(10),
+                    ),
+                    child: Text(
+                      'Motivo del rechazo: ${pub['motivoRechazo']}',
+                      style: TextStyle(
+                        color: Colors.red.shade800,
+                        fontSize: 13,
+                      ),
+                    ),
+                  ),
+                ],
               ],
             ),
           ),
