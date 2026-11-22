@@ -31,9 +31,13 @@ android {
 
     buildTypes {
         release {
-            // TODO: Add your own signing config for the release build.
             // Signing with the debug keys for now, so `flutter run --release` works.
             signingConfig = signingConfigs.getByName("debug")
+
+            // El plugin de preferencias llama a código Kotlin por nombre y el
+            // recorte de código (R8) lo renombra, lo que rompe la sesión.
+            isMinifyEnabled = false
+            isShrinkResources = false
         }
     }
 }
